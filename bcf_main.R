@@ -2,6 +2,8 @@
 #p = 2 #two control variables
 library(tidyverse)
 library("bcf")
+library(latex2exp)
+
 source('~/Documents/GitHub/bcf_discussion/functions.R')
 p=2
 n = 250
@@ -28,9 +30,9 @@ mu_function<- function(x1, x2){
   return(-3 + 6*pnorm(x2 - x1))  
 }
 
-pi_function<- function(x1, x2){
+pi_function<- function(x1, x2, alpha = 1){
   #  return( alpha*(0.8*pnorm(mu_function(x1, x2)/ (0.05*(4-x1- x2) +0.25 )) + 0.0125*(x1 +x2) ) +0.05*(18 - 17*alpha)) 
-  return( alpha*(0.8*pnorm(mu_function(x1, x2)/ (0.05*(4-x1- x2) +0.25 )) + 0.0125*(x1 +x2) ) +0.05*(18 - 17*alpha)) 
+  return( alpha*(0.8*pnorm(mu_function(x1, x2)/ (0.05*(4-x1- x2) +0.25 )) + 0.0125*(x1 +x2) ) + 0.05*(0.5*(19 - 17*alpha)) ) 
 }
 
 n_s = 30
@@ -59,17 +61,21 @@ dev.off()
 
 # generate treatment variable
 # probability of recievng the treatment
-pi = alpha*(0.8* pnorm(q/ (0.1*(2-x[,1]- x[,2]) +0.25 )) + 0.025*(x[,1] +x[,2])) +0.05*(18*alpha - 17)
+pi = alpha*(0.8* pnorm(q/ (0.1*(2-x[,1]- x[,2]) +0.25 )) + 0.025*(x[,1] +x[,2])) +0.05*(0.5*(19 - 17*alpha))
 
 ###
-b=ggplot()
+b=ggplot()+
 x_tilde = x[,1]+  x[,2]
 mu= seq(-3,3,by =0.05)
 for(i in 1:20){
   b <- b + geom_line(aes(x=mu,y=pi), 
-                     data = tibble(mu = mu, pi = 0.8* pnorm(mu/ (0.1*(2-x_tilde[i]) +0.25) ) + 0.025*(x_tilde[i]) +0.05 ))
+                     data = tibble(mu = mu, pi = 0.8* pnorm(mu/ (0.1*(2-x_tilde[i]) +0.25) ) + 0.025*(x_tilde[i]) +0.05*(0.5*(19 - 17*alpha))))
+
 }
-print(b)
+
+pdf(file="pi_vs_mu.pdf",width=5,height=3)
+print(b+xlab(TeX(sprintf('$\\mu$')))+ylab(TeX(sprintf('$\\pi$'))) +theme_bw())
+dev.off()
 
 
 #treatment
@@ -92,7 +98,7 @@ y = mu + sigma*rnorm(n)
 # If you didn't know pi, you would estimate it here
 pihat = pnorm(q)
 
-bcf_fit = bcf(y, z, x,x, pihat, nburn=2000, nsim=10000,include_pi= "both")
+bcf_fit = bcf(y, z, x,x, pihat, nburn=2000, nsim=10000,include_pi= "control")
 
 
 
@@ -108,11 +114,14 @@ tauhat = colMeans(tau_post)
 #plot(tauhat,rep(tau,250));
 #abline(0,1)
 
+## rmse error
 RMSE= sqrt(sum((-1 - tauhat)^2)/n)
 RMSE
 
+## bias
 bias= mean(-1 - tauhat )
 bias
 
-
-
+## coverage
+coverage = 
+coverage
