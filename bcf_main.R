@@ -7,32 +7,30 @@ library(latex2exp)
 source('~/Documents/GitHub/bcf_discussion/functions.R')
 p=2
 n = 250
-
 alpha = 1
-
-n_burn <- 2000
-n_sim <- 5000
+n_burn <- 1000
+n_sim <- 3000
 
 #
-set.seed(10)
+set.seed(1)
 #### control variables matrix x_i ~ Unif(0,1)
 x = matrix(runif(n*p, min = 0, max = 2), nrow=n)
 # create targeted selection
-q= pnorm(x[,2]- x[,1]) 
+q= -3 + 6*pnorm((x[,2]- x[,1])) 
 #sq<- summary(q)
 #sq
 
-#l = x[,2]- x[,1]
+#l = (x[,2]- x[,1])
 #plot(density(l))
 
 
 mu_function<- function(x1, x2){
-  return(-3 + 6*pnorm(x2 - x1))  
+  return(-3 + 6*pnorm((x2 - x1)))  
 }
 
 pi_function<- function(x1, x2, alpha = 1){
-  #  return( alpha*(0.8*pnorm(mu_function(x1, x2)/ (0.05*(4-x1- x2) +0.25 )) + 0.0125*(x1 +x2) ) +0.05*(18 - 17*alpha)) 
-  return( alpha*(0.8*pnorm(mu_function(x1, x2)/ (0.05*(4-x1- x2) +0.25 )) + 0.0125*(x1 +x2) ) + 0.05*(0.5*(19 - 17*alpha)) ) 
+    return( alpha*(0.8*pnorm(mu_function(x1, x2)/ (0.05*(4-x1- x2) +0.25 )) + 0.0125*(x1 +x2) ) +0.05*(0.5*(19 - 17*alpha)) ) 
+  #return( alpha*(0.8*pnorm(mu_function(x1, x2)/ (0.1*(2-x1- x2) +0.25 )) + 0.025*(x1 +x2)) + 0.05*(0.5*(19 - 17*alpha)) ) 
 }
 
 n_s = 30
@@ -61,17 +59,19 @@ dev.off()
 
 # generate treatment variable
 # probability of recievng the treatment
-pi = alpha*(0.8* pnorm(q/ (0.1*(2-x[,1]- x[,2]) +0.25 )) + 0.025*(x[,1] +x[,2])) +0.05*(0.5*(19 - 17*alpha))
+#pi = alpha*(0.8* pnorm(q/ (0.1*(2-x[,1]- x[,2]) +0.25 )) + 0.025*(x[,1] +x[,2])) +0.05*(0.5*(19 - 17*alpha))
+pi = alpha*(0.8* pnorm(q/ (0.05*(4-x[,1]- x[,2]) +0.25 )) + 0.0125*(x[,1]+ x[,2]) ) +0.05*(0.5*(19 - 17*alpha))
 
 ###
-b=ggplot()+
+
+b=ggplot()
 x_tilde = x[,1]+  x[,2]
 mu= seq(-3,3,by =0.05)
 for(i in 1:20){
   b <- b + geom_line(aes(x=mu,y=pi), 
-                     data = tibble(mu = mu, pi = 0.8* pnorm(mu/ (0.1*(2-x_tilde[i]) +0.25) ) + 0.025*(x_tilde[i]) +0.05*(0.5*(19 - 17*alpha))))
-
+                     data = tibble(mu = mu, pi = 0.8* pnorm(mu/ (0.1*(2-x_tilde[i]) +0.25) ) + 0.025*(x_tilde[i]) +0.05 ))
 }
+print(b)
 
 pdf(file="pi_vs_mu.pdf",width=5,height=3)
 print(b+xlab(TeX(sprintf('$\\mu$')))+ylab(TeX(sprintf('$\\pi$'))) +theme_bw())
@@ -83,8 +83,7 @@ z = rbinom(n,1,pi)
 
 
 # tau is the true (homogeneous) treatment effect
-#tau = (0.5*(x[,3] > -3/4) + 0.25*(x[,3] > 0) + 0.25*(x[,3]>3/4))
-tau = -1
+tau = 1
 
 # generate the response using q, tau and z
 mu = (q + tau*z)
@@ -98,30 +97,64 @@ y = mu + sigma*rnorm(n)
 # If you didn't know pi, you would estimate it here
 pihat = pnorm(q)
 
-bcf_fit = bcf(y, z, x,x, pihat, nburn=2000, nsim=10000,include_pi= "control")
+bcf_fit = bcf(y, z, x,x, pihat, nburn=n_burn, nsim=n_sim,include_pi= "control")
 
 
 
 ## convergence assessment for BCF
+summary(bcf_fit)
 
 
-## BART(?)
 
 
 # Get posterior of treatment effects
+
+
+tau_ests <- data.frame(Mean  = colMeans(bcf_fit$tau),
+                       Low95 = apply(bcf_fit$tau, 2, function(x) quantile(x, 0.025)),
+                       Up95  = apply(bcf_fit$tau, 2, function(x) quantile(x, 0.975)))
+
+
+
 tau_post = bcf_fit$tau
 tauhat = colMeans(tau_post)
 #plot(tauhat,rep(tau,250));
 #abline(0,1)
 
 ## rmse error
-RMSE= sqrt(sum((-1 - tauhat)^2)/n)
+RMSE= sqrt(sum((1 - tauhat)^2)/n)
 RMSE
 
 ## bias
-bias= mean(-1 - tauhat )
+bias= mean(tauhat - 1)
 bias
 
 ## coverage
-coverage = 
-coverage
+isCovered <- function(i){
+  ifelse(tau_ests$Low95[i] <= tau & tau <= tau_ests$Up95[i], 1, 0)
+}
+
+coverage <- lapply(1:length(tau_ests$Mean), isCovered)
+perCoverage <- sum(unlist(coverage))/length(tau_ests)
+perCoverage
+
+mean(tauhat)
+
+
+#### BART 
+library(bartCause)
+bartc1 <- bartc(response = y, treatment = z, confounders = x, method.rsp = "bart", method.trt = "none", n.samples = 3000)
+summary(bartc1)
+
+ites <- extract(bartc1, type = "ite")
+tau_x  = apply(ites, 2, mean)
+RMSE_bart= sqrt(sum((1 - tau_x)^2)/n)
+RMSE_bart
+
+
+
+####################################################################################################
+#bart_ <- bart(x, y, )
+
+
+

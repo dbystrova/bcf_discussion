@@ -18,7 +18,11 @@ lissage  =function(m){
 }
 
 # 3D-plot
-build3ds1<-function(x,y,z,par1=""){
+build3ds1<-function(x,y,z,z_lim= "None",par1=""){
+  if (length(z_lim)==1) {zlim =  c(min(z),max(z))}
+  else{
+    zlim= z_lim
+    }
   z<-pmin(z,5)
   nrz <- nrow(z)
   ncz <- ncol(z)
@@ -35,7 +39,7 @@ build3ds1<-function(x,y,z,par1=""){
     x = sigma_param, 
     y = theta_param, 
     z = z, 
-    zlim = c(min(z),max(z)), 
+    zlim = zlim, 
     col = color[facetcol], 
     theta = -25, 
     phi = 25,
