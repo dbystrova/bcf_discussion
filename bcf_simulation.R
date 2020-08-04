@@ -3,6 +3,7 @@
 library(tidyverse)
 library("bcf")
 library(latex2exp)
+library(viridis)
 
 source('~/Documents/GitHub/bcf_discussion/functions.R')
 p=2
@@ -45,17 +46,17 @@ pi_0 <-  outer(x1,x2,Vectorize(pi_function),alpha=0)
 #pi_0 = lissage(pi_0) # do it about ten times :-)
 
 
-pdf(file="mu.pdf",width=10,height=6)
+pdf(file="mu.pdf",width=5,height=3)
 build3ds1(x1,x2,mu_,par1= expression(paste(italic(mu))) )
 dev.off()
-pdf(file="pi_1.pdf",width=10,height=6)
+pdf(file="pi_1.pdf",width=3,height=2)
 build3ds1(x1,x2,pi_1,z_lim=c(0,1),par1= expression(paste(italic(pi))) )
 dev.off()
-pdf(file="pi_05.pdf",width=10,height=6)
+pdf(file="pi_05.pdf",width=3,height=2)
 build3ds1(x1,x2,pi_05,z_lim=c(0,1),par1= expression(paste(italic(pi))) )
 dev.off()
 
-pdf(file="pi_0.pdf",width=10,height=6)
+pdf(file="pi_0.pdf",width=3,height=2)
 build3ds1(x1,x2,pi_0,z_lim=c(0,1), par1= expression(paste(italic(pi))) )
 dev.off()
 
@@ -72,17 +73,19 @@ pdf(file="pi_vs_mu.pdf",width=5,height=3)
 print(b+xlab(TeX(sprintf('$\\mu$')))+ylab(TeX(sprintf('$\\pi$'))) +theme_bw())
 dev.off()
 
-b=ggplot() + scale_color_gradient2(midpoint=mid, low="blue", mid="white",
-                                   high="red", space ="Lab" )
+b=ggplot() 
+
 #x_tilde = x[,1]+  x[,2]
 x_tilde =1
 mu= seq(-3,3,by =0.05)
 alpha_seq=seq(0,0.5,by =0.05)
 for(i in 1:length(alpha_seq)){
   b <- b + geom_line(aes(x=mu,y=pi), 
-                     data = tibble(mu = mu, pi = alpha_seq[i]*(0.8*pnorm(mu/ (0.1*(2-x_tilde) +0.25) ) +0.025*(x_tilde)) +0.05*(0.5*(19 - 17*alpha_seq[i])) ), color = i)
+                     data = tibble(mu = mu, pi = alpha_seq[i]*(0.8*pnorm(mu/ (0.1*(2-x_tilde) +0.25) ) +0.025*(x_tilde)) +0.05*(0.5*(19 - 17*alpha_seq[i]))))
 }
+pdf(file="pi_vs_mu_alpha.pdf",width=5,height=3)
 print(b)
+dev.off()
 
 
 simulation <- function(i,alpha ){
@@ -117,6 +120,10 @@ simulation <- function(i,alpha ){
   tau_ests <- data.frame(Mean  = colMeans(bcf_fit$tau),
                          Low95 = apply(bcf_fit$tau, 2, function(x) quantile(x, 0.025)),
                          Up95  = apply(bcf_fit$tau, 2, function(x) quantile(x, 0.975)))
+  tau_ate <- data.frame(Mean  = mean(colMeans(bcf_fit$tau)),
+                         Low95 = quantile(rowMeans(bcf_fit$tau), 0.025),
+                         Up95  = quantile(rowMeans(bcf_fit$tau), 0.975))
+  
   tau_post = bcf_fit$tau
   tauhat = colMeans(tau_post)
   ## rmse error
@@ -130,66 +137,109 @@ simulation <- function(i,alpha ){
   coverage <- lapply(1:length(tau_ests$Mean), isCovered)
   perCoverage <- sum(unlist(coverage))/length(tau_ests)
   bcf_ate = mean(tauhat)
+  coverage_bcf =  ifelse(tau_ate$Low95<= tau & tau <=tau_ate$Up95, 1, 0)
   #Bart
   bartc1 <- bartc(response = y, treatment = z, confounders = x, method.rsp = "bart", method.trt = "none", n.samples = 3000)
-  bart_ate = summary(bartc1)[9]$estimates[1]
+  bart_ate = unlist(summary(bartc1)[9]$estimates[1])
   #ites <- extract(bartc1, type = "ite")
   #tau_x  = apply(ites, 2, mean)
   #RMSE_bart= sqrt(sum((1 - tau_x)^2)/n)
   #RMSE_bart
-  return(list(bcf_ate =bcf_ate, bcf_cover =perCoverage, bcf_bias = bias, bcf_rmse= RMSE, bart_ate = bart_ate))
+  coverage_bart =  as.numeric(ifelse(summary(bartc1)[9]$estimates[3]<= tau & tau <=summary(bartc1)[9]$estimates[4], 1, 0))
+  return( tibble(i=i, bcf_ate =bcf_ate,bcf_coverage =coverage_bcf,bcf_cover =perCoverage, bcf_bias = bias, bcf_rmse= RMSE,bart_ate = bart_ate, bart_coverage = coverage_bart))
+ # return(list(bcf = list(bcf_ate =bcf_ate,bcf_coverage =coverage_bcf,bcf_cover =perCoverage, bcf_bias = bias, bcf_rmse= RMSE), bart= list(bart_ate = bart_ate, bart_coverage = coverage_bart))) 
 }
 
-bart_ate_<-c()
-bcf_ate_<- c()
-
-for (i in 1:10){
-  sim= simulation(i, alpha =0.5)
-  bart_ate_ <- c(bart_ate_, sim$bart_ate)
-  bcf_ate_ <- c(bcf_ate_, sim$bcf_ate)
+alpha_seq <- seq(0, 1, by = 0.2)
+data_alpha_list = list()
+for (j in 1:length(alpha_seq)){
+  datalist = list()
+  for (i in 1:20){
+   dat <- simulation(i, alpha =alpha_seq[j])
+   dat$alpha = alpha_seq[j]
+   #dat =  column_to_rownames(dat, var = "i")
+   rownames(dat) <- NULL
+   datalist[[i]] <- as.data.frame(dat)
+  }
+  df = do.call(rbind, datalist)
+  dat_alpha = tibble(alpha =alpha_seq[j],
+                    fin_rmse_bart = sqrt(mean((unlist(df$bart_ate ) - 1)^2)),
+                    fin_rmse_bcf = sqrt(mean((df$bcf_ate  - 1)^2)),
+                    bias_bart= mean(unlist(df$bart_ate ) - 1),
+                    bias_bcf =  mean(df$bcf_ate  - 1),
+                    bart_coverage = sum(df$bart_coverage)/length(df$bart_coverage),
+                    bcf_coverage = sum(df$bcf_coverage)/length(df$bcf_coverage))
+  data_alpha_list[[j]]<- dat_alpha
 }
 
-#sqrt(mean((unlist(bart_ate_)  - 1)^2))
+df_alpha_ <-  do.call(rbind, data_alpha_list)
 
-fin_rmse_bart = sqrt(mean((unlist(bart_ate_)  - 1)^2))
-fin_rmse_bcf = sqrt(mean((unlist(bcf_ate_)  - 1)^2))
+df_alpha_[, c("alpha","bias_bart", "bias_bcf")]%>% gather(Model, bias, bias_bart:bias_bcf)%>%
+  ggplot(aes(x=alpha,y=bias,col=Model))+geom_line(alpha=0.7)+ scale_color_viridis(discrete=TRUE)+
+  #labs(title="Rmse")+
+  xlab("iterations")+ylab("bias") +theme_bw()
 
-fin_rmse_bart
-fin_rmse_bcf
+  
 
-bias_bart= mean((unlist(bart_ate_)  - 1))
-bias_bcf =  mean((unlist(bcf_ate_)  - 1))
-bias_bart
-bias_bcf
-# 
-isCovered <- function(i){
-  ifelse(tau_ests$Low95[i] <= tau & tau <= tau_ests$Up95[i], 1, 0)
-}
-coverage <- lapply(1:length(tau_ests$Mean), isCovered)
-perCoverage <- sum(unlist(coverage))/length(tau_ests)
-bcf_ate = mean(tauhat)
-coverage
-# 
 
-bart_Low95 = quantile(unlist(bart_ate_), 0.025)
-bart_Up95  = quantile(unlist(bart_ate_), 0.975)
+df_alpha_[, c("alpha","fin_rmse_bart", "fin_rmse_bcf")]%>% gather(Model, Rmse, fin_rmse_bart:fin_rmse_bcf)%>%
+  ggplot(aes(x=alpha,y=Rmse,col=Model))+geom_line(alpha=0.7)+ scale_color_viridis(discrete=TRUE)+
+  #labs(title="Bias")+
+  xlab("iterations")+ylab("RMSE") +theme_bw()
 
-bcf_Low95 = quantile(unlist(bcf_ate_), 0.025)
-bcf_Up95  = quantile(unlist(bcf_ate_), 0.975)
 
-# library(bartCause)
-# bartc1 <- bartc(response = y, treatment = z, confounders = x, method.rsp = "bart", method.trt = "none", n.samples = 3000)
-# summary(bartc1)
-# 
-# ites <- extract(bartc1, type = "ite")
-# tau_x  = apply(ites, 2, mean)
-# RMSE_bart= sqrt(sum((1 - tau_x)^2)/n)
-# RMSE_bart
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 
 # 
 # 
-# ####################################################################################################
-# #bart_ <- bart(x, y, )
+# bart_rmse<- c()
+# bart_rmse<- c()
 # 
-
-
+# alpha_seq <- seq(0, 1, by = 0.1)
+# for (j in 1:11){
+#   bart_ate_<-c()
+#   bcf_ate_<- c()
+#   bcf_c <- c()
+#   bart_c<- c()
+#   for (i in 1:10){
+#     sim= simulation(i, alpha =alpha_seq[j])
+#     bart_ate_ <- c(bart_ate_, sim$bart$bart_ate)
+#     bcf_ate_ <- c(bcf_ate_, sim$bcf$bcf_ate)
+#     bart_c <-c(bart_c, sim$bart$bart_coverage) 
+#     bcf_c <-c(bcf_c, sim$bcf$bcf_coverage) 
+#   }
+# fin_rmse_bart = sqrt(mean((unlist(bart_ate_)  - 1)^2))
+# fin_rmse_bcf = sqrt(mean((unlist(bcf_ate_)  - 1)^2))
+# 
+# fin_rmse_bart
+# fin_rmse_bcf
+# 
+# bias_bart= mean((  - 1))
+# bias_bcf =  mean((unlist(bcf_ate_)  - 1))
+# bias_bart
+# bias_bcf
+# 
+# bart_coverage = sum(unlist(bart_c))/length(bart_c)
+# bart_coverage
+# 
+# bcf_coverage = sum(unlist(bcf_c))/length(bcf_c)
+# bcf_coverage
+# 
+# 
+# }
+# 
