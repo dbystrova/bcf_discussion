@@ -44,11 +44,11 @@ build3ds1<-function(x,y,z,z_lim= "None",par1=""){
     theta = -25, 
     phi = 25,
     ltheta = 120, 
-    ticktype = "detailed", 
+    ticktype = "simple", 
     shade = 0.3,
     xlab = "", ylab = "", zlab = "", 
     d = 5, r = 10,
-    cex.axis = 1, cex.lab = 1.3, nticks = 3, main =par1)
-  text(.13,-.37,expression(x[1]), cex = 1.5)
-  text(-.3,-.35,expression(x[2]), cex = 1.5)
+    cex.axis = 2, cex.lab = 1.5, cex.main = 3.2, nticks = 3, main =par1)
+  text(.142,-.37,expression(x[1]), cex = 3.2)
+  text(-.3,-.35,expression(x[2]), cex = 3.2)
 }
