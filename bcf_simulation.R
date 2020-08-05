@@ -87,7 +87,7 @@ simulation <- function(i,alpha ){
   #### control variables matrix x_i ~ Unif(0,1)
   x = matrix(runif(n*p, min = 0, max = 1), nrow=n)
   # create targeted selection
-  q= -3 + 6*pnorm((2*(x[,2]- x[,1]))) 
+  q= -3 + 6*pnorm((2*(x[,1]- x[,2]))) 
   # generate treatment variable
   # probability of recievng the treatment
   pi = alpha*(0.8* pnorm(q/ (0.1*(2-x[,1]- x[,2]) +0.25 )) + 0.025*(x[,1] +x[,2])) +0.05*(0.5*(19 - 17*alpha))
@@ -170,19 +170,25 @@ for (j in 1:length(alpha_seq)){
 }
 
 df_alpha_ <-  do.call(rbind, data_alpha_list)
-
+#save(df_alpha_, file = "alpha_05.Rdata")
 pdf(file="bias.pdf",width=5,height=3)
 df_alpha_[, c("alpha","bias_bart", "bias_bcf")]%>% gather(Model, bias, bias_bart:bias_bcf)%>%
   ggplot(aes(x=alpha,y=bias,col=Model))+geom_line(alpha=0.7)+ scale_color_viridis(discrete=TRUE)+
-  #labs(title="Rmse")+
-  xlab(TeX(sprintf('$\\alpha$')))+ylab("bias") +theme_bw() +theme(legend.position="none")
+  xlab(TeX(sprintf('$\\alpha$')))+ylab("Bias") +theme_bw() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 1,size = 12),axis.text.y = element_text(angle = 0, hjust = 1,size = 12),legend.position = "none", plot.title = element_text(hjust = 0.5),
+        axis.title.y = element_text(size = rel(1.5), angle = 90),
+        axis.title.x = element_text(size = rel(1.5), angle = 00))
+
 dev.off()
 
 pdf(file="rmse.pdf",width=5,height=3)
 df_alpha_[, c("alpha","fin_rmse_bart", "fin_rmse_bcf")]%>% gather(Model, Rmse, fin_rmse_bart:fin_rmse_bcf)%>%
   ggplot(aes(x=alpha,y=Rmse,col=Model))+geom_line(alpha=0.7)+ scale_color_viridis(discrete=TRUE)+
   #labs(title="Bias")+
-  xlab(TeX(sprintf('$\\alpha$')))+ylab("RMSE") +theme_bw()+ theme(legend.position="none")
+  xlab(TeX(sprintf('$\\alpha$')))+ylab("RMSE") +theme_bw()+ theme(legend.position="none")+
+  theme(axis.text.x = element_text(angle = 0, hjust = 1,size = 12),axis.text.y = element_text(angle = 0, hjust = 1,size = 12),legend.position = "none", plot.title = element_text(hjust = 0.5),
+        axis.title.y = element_text(size = rel(1.5), angle = 90),
+        axis.title.x = element_text(size = rel(1.5), angle = 00))
 dev.off()
 
 
