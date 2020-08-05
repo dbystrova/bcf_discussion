@@ -68,7 +68,6 @@ dev.off()
 
 alpha_colors= viridis(11)
 b=ggplot() 
-#x_tilde = x[,1]+  x[,2]
 x_tilde =1
 mu= seq(-3,3,by =0.05)
 alpha_seq=seq(0,0.5,by =0.05)
@@ -89,7 +88,7 @@ simulation <- function(i,alpha ){
   # create targeted selection
   q= -3 + 6*pnorm((2*(x[,1]- x[,2]))) 
   # generate treatment variable
-  # probability of recievng the treatment
+  # probability of recieving the treatment
   pi = alpha*(0.8* pnorm(q/ (0.1*(2-x[,1]- x[,2]) +0.25 )) + 0.025*(x[,1] +x[,2])) +0.05*(0.5*(19 - 17*alpha))
   #treatment
   z = rbinom(n,1,pi)
@@ -103,7 +102,7 @@ simulation <- function(i,alpha ){
   # draw the response variable with additive error
   y = mu + sigma*rnorm(n)
   
-  # If you didn't know pi, you would estimate it here
+  # estimate pihat here
   #pihat = pnorm(q)
   pihat = pi
 
@@ -148,19 +147,18 @@ alpha_seq <- seq(0, 1, by = 0.2)
 data_alpha_list = list()
 for (j in 1:length(alpha_seq)){
   datalist = list()
-  for (i in 1:100){
-   dat <- simulation(i, alpha =alpha_seq[j])
+  for (i in 1:50){
+   dat <- simulation(j*50 + i, alpha =alpha_seq[j])
    dat$alpha = alpha_seq[j]
-   #dat =  column_to_rownames(dat, var = "i")
-   rownames(dat) <- NULL
+   #rownames(dat) <- NULL
    datalist[[i]] <- as.data.frame(dat)
    print(c(i,j))
   }
   df = do.call(rbind, datalist)
   dat_alpha = tibble(alpha =alpha_seq[j],
-                     fin_rmse_bart = sqrt(mean((unlist(df$bart_ate ) + 1)^2)),
+                     fin_rmse_bart = sqrt(mean((df$bart_ate + 1)^2)),
                      fin_rmse_bcf = sqrt(mean((df$bcf_ate  + 1)^2)),
-                     bias_bart= mean(unlist(df$bart_ate ) + 1),
+                     bias_bart= mean(df$bart_ate + 1),
                      bias_bcf =  mean(df$bcf_ate  + 1),
                      ate_bart_q10 = quantile(df$bart_ate, 0.1),
                      ate_bart_q90 = quantile(df$bart_ate, 0.9),
@@ -170,7 +168,7 @@ for (j in 1:length(alpha_seq)){
 }
 
 df_alpha_ <-  do.call(rbind, data_alpha_list)
-#save(df_alpha_, file = "alpha_05.Rdata")
+#save(df_alpha_, file = "alpha_100.Rdata")
 pdf(file="bias.pdf",width=5,height=3)
 df_alpha_[, c("alpha","bias_bart", "bias_bcf")]%>% gather(Model, bias, bias_bart:bias_bcf)%>%
   ggplot(aes(x=alpha,y=bias,col=Model))+geom_line(alpha=0.7)+ scale_color_viridis(discrete=TRUE)+
@@ -205,32 +203,11 @@ for (i in 1:(12)){
   if (grepl("bcf",df_bias$Model[i], fixed = TRUE)){df_bias$Model[i] = "bcf"}
   
 }
-
+# 
 pdf(file="bias_ribbon.pdf",width=5,height=3)
 bias_all <- cbind(df_bias, dq10[, "q10"], dq90[, "q90"])
 bias_all%>% ggplot(aes(x=alpha,y=bias,col=Model))+geom_line(alpha=0.9, size=1)+ geom_ribbon(aes(ymin = q10 + 1, ymax = q90 + 1),linetype = 2,alpha=0.0) +
   xlab(TeX(sprintf('$\\alpha$')))+ylab("bias") +theme_bw() +theme(legend.position="none")
 dev.off()
 
-
-
-
-
-# 
-# library(dbarts)
-# bartFit<- bart(x, y, nskip = 350, ntree = 1000)
-# plot(bartFit)
-# 
-# df2 <- data.frame(df, 
-#                   ql = apply(bartFit$yhat.train, length(dim(bartFit$yhat.train)), quantile,probs=0.05),
-#                   qm = apply(bartFit$yhat.train, length(dim(bartFit$yhat.train)), quantile,probs=.5),
-#                   qu <- apply(bartFit$yhat.train, length(dim(bartFit$yhat.train)), quantile,probs=0.95)
-# )
-# 
-# bartp <- ggplot(df2, aes(x= y, y = qm)) + geom_linerange(aes(ymin = ql, ymax = qu), col = "grey") +
-#   geom_point() + geom_smooth() +
-#   geom_abline(intercept = 0, slope = 1, col = "red", size = 1)
-# 
-# bartp
-# 
 
