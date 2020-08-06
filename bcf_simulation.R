@@ -126,11 +126,11 @@ simulation <- function(i,alpha ){
   return( tibble(i=i, bcf_ate = bcf_ate, bart_ate = bart_ate))
 }
 
-alpha_seq <- seq(0, 1, by = 0.2)
+alpha_seq <- seq(0, 1, by = 0.1)
 data_alpha_list = list()
 for (j in 1:length(alpha_seq)){
   datalist = list()
-  for (i in 1:50){
+  for (i in 1:200){
    dat <- simulation(j*50 + i, alpha =alpha_seq[j])
    dat$alpha = alpha_seq[j]
    datalist[[i]] <- as.data.frame(dat)
