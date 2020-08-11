@@ -102,7 +102,7 @@ for (j in 1:length(alpha_seq)){
 
 df_alpha_ <-  do.call(rbind, data_alpha_list)
 #save(df_alpha_, file = "alpha_100.Rdata")
-pdf(file="plots/bias.pdf",width=5,height=3)
+pdf(file="plots/bias_200.pdf",width=5,height=3)
 df_alpha_[, c("alpha","bias_bart", "bias_bcf")]%>% gather(Model, bias, bias_bart:bias_bcf)%>%
   ggplot(aes(x=alpha,y=bias,col=Model))+geom_line(alpha=0.7)+ scale_color_viridis(discrete=TRUE)+
   xlab(TeX(sprintf('$\\alpha$')))+ylab("Bias") +theme_bw() +
@@ -112,7 +112,7 @@ df_alpha_[, c("alpha","bias_bart", "bias_bcf")]%>% gather(Model, bias, bias_bart
 
 dev.off()
 
-pdf(file="plots/rmse.pdf",width=5,height=3)
+pdf(file="plots/rmse_200.pdf",width=5,height=3)
 df_alpha_[, c("alpha","fin_rmse_bart", "fin_rmse_bcf")]%>% gather(Model, Rmse, fin_rmse_bart:fin_rmse_bcf)%>%
   ggplot(aes(x=alpha,y=Rmse,col=Model))+geom_line(alpha=0.7)+ scale_color_viridis(discrete=TRUE)+
   #labs(title="Bias")+
